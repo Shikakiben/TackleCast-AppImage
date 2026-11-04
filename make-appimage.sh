@@ -40,27 +40,32 @@ quick-sharun /usr/bin/tacklecast
 # Turn AppDir into AppImage
 quick-sharun --make-appimage
 
-# quick-sharun --test only checks that the app survives ~10 seconds: it does NOT
-# prove that anything was rendered. The renderer logs its summary after ~30 s,
-# so the first test is a liveness check and the second one asserts a real fps.
-quick-sharun --test ./dist/*.AppImage --test-nv12 || :
-quick-sharun --test ./dist/*.AppImage --test-mjpeg || :
+# quick-sharun --test only checks that the app survives ~10 seconds: it does
+# NOT prove that anything was rendered. It is kept as a smoke test, but the real
+# signal is the frame rate asserted below.
+quick-sharun --test ./dist/*.AppImage --test-nv12
+quick-sharun --test ./dist/*.AppImage --test-mjpeg
 
 # Assert an actual rendered frame rate. A capture-card app that cannot render is
-# useless, and the exit code would not tell us. This needs an X server:
-# quick-sharun --test starts its own Xvfb, a bare command does not, and without
-# DISPLAY the app exits before it ever logs a summary.
-APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a timeout 60 ./dist/*.AppImage --test-nv12 \
-    >/dev/null 2>&1 || :
+# useless, and the exit code does not tell us (the wrapper returns 0 even when
+# the app died). Two reasons this is a separate, longer run:
+#  - the renderer logs its summary only after ~30 s;
+#  - an isolated XDG_STATE_HOME guarantees the log we parse comes from THIS run
+#    and not from an earlier one.
+TEST_STATE=$(mktemp -d)
+export XDG_STATE_HOME="$TEST_STATE"
+export APPIMAGE_EXTRACT_AND_RUN=1
+xvfb-run -a timeout 60 ./dist/*.AppImage --test-nv12 >/dev/null 2>&1 || :
 
-FPS_LOG=$(ls -t "${XDG_STATE_HOME:-$HOME/.local/state}"/tacklecast/logs/*.log 2>/dev/null | head -1)
+FPS_LOG=$(ls -t "$TEST_STATE"/tacklecast/logs/*.log 2>/dev/null | head -1)
 [ -n "$FPS_LOG" ]
 echo "Reading render summary from $FPS_LOG"
 
 # Fail unless the log shows a strictly positive rendered rate. Matching the
-# positive case (rather than blacklisting "0.0") keeps this honest: a missing
-# summary must not pass either.
+# positive case keeps this honest: a missing summary must not pass either.
 FPS=$(sed -n 's/.*render summary: \([0-9][0-9.]*\) rendered fps.*/\1/p' "$FPS_LOG" | tail -1)
 [ -n "$FPS" ]
 echo "Rendered ${FPS} fps"
-awk -v fps="$FPS" 'BEGIN { exit !(fps + 0 > 0) }'
+awk -v fps="$FPS" 'BEGIN { if (fps + 0 <= 0) exit 1 }'
+
+rm -rf "$TEST_STATE"

@@ -1,0 +1,27 @@
+diff --git a/src/render.rs b/src/render.rs
+index 70fbbdd..56d6ce6 100644
+--- a/src/render.rs
++++ b/src/render.rs
+@@ -71,13 +71,19 @@ impl Renderer {
+         gamma: f32,
+     ) -> Result<Self, RenderError> {
+         let size = window.inner_size();
+-        // Prefer DX12 on Windows so that CUDA ↔ DX12 zero-copy interop works.
+-        // Fall back to all backends if DX12 isn't available.
++        // The renderer is Vulkan-only on Linux: wgpu::Backends::all() also
++        // offers GL, and wgpu then picks a GL adapter that lacks the features
++        // the compute pipeline needs ("The selected version doesn't support
++        // Features(BUFFER_STORAGE | COMPUTE_SHADER | DYNAMIC_ARRAY_SIZE)",
++        // followed by "Parent device is lost"). Asking for Vulkan explicitly
++        // makes wgpu select the Vulkan adapter, including lavapipe.
+         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+             backends: if cfg!(windows) {
++                // Prefer DX12 on Windows so that CUDA <-> DX12 zero-copy
++                // interop works.
+                 wgpu::Backends::DX12
+             } else {
+-                wgpu::Backends::all()
++                wgpu::Backends::VULKAN
+             },
+             ..Default::default()
+         });

@@ -36,6 +36,31 @@ Alt-Tab). Le patch ajoute `set_window_icon()` qui décode `assets/icon.png` via 
 `Window::set_window_icon` n'est pas implémenté sur Wayland (limite du protocole, l'icône
 vient alors du `.desktop`), un no-op silencieux y est attendu.
 
+## 0003 — forcer le backend Vulkan (obligatoire pour l'AppImage)
+
+`src/render.rs` demandait `wgpu::Backends::all()` sous Linux, ce qui autorise
+wgpu à choisir un adaptateur **GL**. Dans l'AppImage, il le choisit puis échoue :
+
+```
+indirect-validation error: ... The selected version doesn't support
+Features(BUFFER_STORAGE | COMPUTE_SHADER | DYNAMIC_ARRAY_SIZE)
+renderer initialization failed: failed to request device: Parent device is lost
+```
+
+Le patch demande `wgpu::Backends::VULKAN`. Le binaire nu était déjà en Vulkan
+par chance de l'environnement ; l'AppImage, elle, embarque un stack
+Mesa/gallium qui rend GL attractif pour wgpu.
+
+**Prouvé par A/B** (même conteneur, même AppImage, une seule variable) :
+
+| Backend | Résultat packagé |
+|---|---|
+| `Backends::all()` | ❌ `Parent device is lost` |
+| `Backends::VULKAN` | ✅ **55,2 fps** (`render summary`) |
+
+C'est aussi un bon candidat de PR upstream : TackleCast n'a aucun intérêt à
+rendre en GL, et le comportement actuel dépend du hasard de l'environnement.
+
 ## Vérifications faites avant de figer les patchs
 
 - `cargo build --release --locked` OK avec les deux patchs (Rust 1.99.1, FFmpeg 8.1.3).

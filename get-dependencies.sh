@@ -106,6 +106,7 @@ echo "Applying patches..."
 echo "---------------------------------------------------------------"
 patch -p1 -d ./src < ./patches/0001-xdg-settings-and-logs.patch
 patch -p1 -d ./src < ./patches/0002-linux-window-icon.patch
+patch -p1 -d ./src < ./patches/0003-vulkan-only-backend.patch
 
 # Fail loudly if upstream drift makes a patch silently useless.
 grep -q 'fn xdg_base_dir' ./src/src/settings.rs
@@ -113,6 +114,7 @@ grep -q 'pub fn logs_path' ./src/src/settings.rs
 grep -q 'crate::settings::logs_path' ./src/src/logger.rs
 grep -q 'fn set_window_icon' ./src/src/main.rs
 grep -q 'set_window_icon(&window)' ./src/src/main.rs
+grep -q 'wgpu::Backends::VULKAN' ./src/src/render.rs
 
 # Keep upstream's own quality gate: a broken patch must never reach a release.
 (cd ./src && cargo fmt --all --check)

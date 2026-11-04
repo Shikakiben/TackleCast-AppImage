@@ -26,10 +26,11 @@ export STARTUPWMCLASS=tacklecast
 # (the app binds two samplers to one texture, which naga rejects once the
 # shipped GL/gallium stack is in play).
 #
-# Status: the bare binary renders 56 fps, but the packaged run is still not
-# validated. In a plain Arch container the renderer init fails with
-# "Parent device is lost", i.e. wgpu lands on GL instead of the bundled
-# lavapipe. Under investigation through CI (see notes-ia/).
+# Status: validated. The bare binary renders 56 fps, and the packaged AppImage
+# now renders too (55.2 fps measured end-to-end through ./AppImage --appimage-extract
+# then AppRun --test-nv12). Before patch 0003, the packaged run failed with
+# "Parent device is lost" because wgpu::Backends::all() picked a GL adapter;
+# patch 0003 asks for Vulkan explicitly.
 export DEPLOY_VULKAN=1
 export DEPLOY_VULKAN_ALL=1
 

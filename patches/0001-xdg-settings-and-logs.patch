@@ -1,0 +1,82 @@
+diff --git a/src/logger.rs b/src/logger.rs
+index 6cc4155..773a5e5 100644
+--- a/src/logger.rs
++++ b/src/logger.rs
+@@ -97,14 +97,9 @@ fn prune_old_logs(logs_dir: &Path) -> std::io::Result<()> {
+ 
+ fn logs_dir() -> PathBuf {
+     if cfg!(debug_assertions) {
+-        std::env::current_dir()
++        return std::env::current_dir()
+             .unwrap_or_else(|_| PathBuf::from("."))
+-            .join("logs")
+-    } else {
+-        std::env::current_exe()
+-            .ok()
+-            .and_then(|path| path.parent().map(PathBuf::from))
+-            .unwrap_or_else(|| PathBuf::from("."))
+-            .join("logs")
++            .join("logs");
+     }
++    crate::settings::logs_path()
+ }
+diff --git a/src/settings.rs b/src/settings.rs
+index e2dca74..eccdd57 100644
+--- a/src/settings.rs
++++ b/src/settings.rs
+@@ -327,19 +327,50 @@ pub fn get_capture_config(
+     }
+ }
+ 
+-pub fn settings_path() -> PathBuf {
+-    let mut base = std::env::current_exe()
++/// Directory the executable lives in, used only when no home directory is known.
++fn executable_dir() -> PathBuf {
++    std::env::current_exe()
+         .ok()
+         .and_then(|path| path.parent().map(PathBuf::from))
+-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
++        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
++}
++
++fn non_empty_env(name: &str) -> Option<PathBuf> {
++    std::env::var_os(name)
++        .filter(|value| !value.is_empty())
++        .map(PathBuf::from)
++}
++
++/// Resolve an XDG base directory: the environment variable when set, otherwise
++/// the standard location under `$HOME`. Returns `None` when the environment
++/// provides no usable home, which happens in minimal or sandboxed sessions.
++fn xdg_base_dir(variable: &str, home_suffix: &str) -> Option<PathBuf> {
++    non_empty_env(variable).or_else(|| non_empty_env("HOME").map(|home| home.join(home_suffix)))
++}
+ 
++/// Properties live in the user's configuration directory. The executable's own
++/// directory is read-only for packaged builds (an AppImage is a read-only
++/// squashfs mount, and system installs are root-owned), so writing settings
++/// there silently loses them.
++pub fn settings_path() -> PathBuf {
+     if cfg!(debug_assertions) {
+         if let Ok(current_dir) = std::env::current_dir() {
+-            base = current_dir;
++            return current_dir.join("tacklecast_settings.json");
+         }
+     }
+ 
+-    base.join("tacklecast_settings.json")
++    match xdg_base_dir("XDG_CONFIG_HOME", ".config") {
++        Some(dir) => dir.join("tacklecast").join("tacklecast_settings.json"),
++        None => executable_dir().join("tacklecast_settings.json"),
++    }
++}
++
++/// Logs are state, not configuration, so they follow XDG_STATE_HOME.
++pub fn logs_path() -> PathBuf {
++    match xdg_base_dir("XDG_STATE_HOME", ".local/state") {
++        Some(dir) => dir.join("tacklecast").join("logs"),
++        None => executable_dir().join("logs"),
++    }
+ }
+ 
+ fn default_audio_index() -> i32 {

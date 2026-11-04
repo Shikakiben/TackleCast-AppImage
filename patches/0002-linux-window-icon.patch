@@ -1,0 +1,40 @@
+diff --git a/src/main.rs b/src/main.rs
+index e4cdcc9..1622dfd 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -76,6 +76,25 @@ struct CliArgs {
+     test_pattern: TestPatternMode,
+ }
+ 
++/// Applies the packaged PNG as the window and taskbar icon.
++///
++/// Windows reads its icon from the executable resource, so this is only needed
++/// on Linux and other Unix desktops, where winit takes an RGBA buffer directly.
++/// Failing to decode or set the icon must never prevent the window from
++/// opening, so every step is best-effort.
++#[cfg(all(unix, not(target_os = "macos")))]
++fn set_window_icon(window: &Window) {
++    let decoded =
++        image::load_from_memory(include_bytes!("../assets/icon.png")).map(|image| image.to_rgba8());
++    let Ok(rgba) = decoded else {
++        return;
++    };
++    let (width, height) = rgba.dimensions();
++    if let Ok(icon) = winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
++        window.set_window_icon(Some(icon));
++    }
++}
++
+ impl CliArgs {
+     fn parse() -> Self {
+         let args: Vec<String> = std::env::args().skip(1).collect();
+@@ -347,6 +366,9 @@ impl App {
+             }
+         }
+ 
++        #[cfg(all(unix, not(target_os = "macos")))]
++        set_window_icon(&window);
++
+         window
+     }
+ 

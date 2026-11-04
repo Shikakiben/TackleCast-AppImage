@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=TackleCast
+GenericName=Capture Card Viewer
+Comment=Low-latency capture card viewer
+Exec=tacklecast
+Icon=tacklecast
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Player;
+Keywords=capture;card;hdmi;stream;elgato;shadowcast;
+StartupWMClass=tacklecast

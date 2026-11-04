@@ -40,7 +40,25 @@ quick-sharun /usr/bin/tacklecast
 # Turn AppDir into AppImage
 quick-sharun --make-appimage
 
-# The smoke test renders a synthetic 1080p pattern (no capture card needed) and
-# must report a non-zero fps in its log. This is the only reliable signal:
-# the exit code of the AppImage wrapper is not one.
-quick-sharun --test ./dist/*.AppImage --test-nv12
+# quick-sharun --test only checks that the app survives ~10 seconds: it does NOT
+# prove that anything was rendered. The renderer logs its summary after ~30 s,
+# so the first test is a liveness check and the second one asserts a real fps.
+quick-sharun --test ./dist/*.AppImage --test-nv12 || :
+quick-sharun --test ./dist/*.AppImage --test-mjpeg || :
+
+# Assert an actual rendered frame rate. A capture-card app that cannot render
+# is useless, and the exit code would not tell us.
+APPIMAGE_EXTRACT_AND_RUN=1 timeout 50 ./dist/*.AppImage --test-nv12 \
+    >/dev/null 2>&1 || :
+
+FPS_LOG=$(ls -t "${XDG_STATE_HOME:-$HOME/.local/state}"/tacklecast/logs/*.log 2>/dev/null | head -1)
+[ -n "$FPS_LOG" ]
+echo "Reading render summary from $FPS_LOG"
+
+# Fail unless the log shows a strictly positive rendered rate. Matching the
+# positive case (rather than blacklisting "0.0") keeps this honest: a missing
+# summary must not pass either.
+FPS=$(sed -n 's/.*render summary: \([0-9][0-9.]*\) rendered fps.*/\1/p' "$FPS_LOG" | tail -1)
+[ -n "$FPS" ]
+echo "Rendered ${FPS} fps"
+awk -v fps="$FPS" 'BEGIN { exit !(fps + 0 > 0) }'

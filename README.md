@@ -27,13 +27,11 @@ This AppImage is also supplied with a self-updater by default, so any updates to
 TackleCast renders exclusively through **Vulkan** (wgpu). There is no OpenGL
 fallback, so an AppImage that ships no Vulkan driver cannot display anything.
 
-This AppImage ships **lavapipe** (Mesa's software Vulkan implementation) and
-prefers the host's Mesa drivers when they work, so:
-
-* with a working host Vulkan driver (AMD, Intel, NVIDIA, or Mesa) → **hardware
-  acceleration**;
-* on a machine or VM without a usable Vulkan driver → **lavapipe** (CPU), which
-  is slower but functional.
+This AppImage ships **lavapipe** (Mesa's software Vulkan implementation), so it
+renders on a machine or VM without a usable GPU driver too, at reduced speed.
+The Vulkan backend is selected explicitly (patch 0003), which is what makes the
+packaged build reliable: left to `Backends::all()`, wgpu picked a GL adapter and
+failed with `Parent device is lost`.
 
 ## Capture card permissions
 
@@ -57,6 +55,8 @@ Two small upstream patches are applied at build time — see
    `$XDG_STATE_HOME` instead of next to the executable, which is a read-only
    mount inside an AppImage.
 2. **0002** applies the window icon on Linux (upstream only does it on Windows).
+3. **0003** requests the Vulkan wgpu backend explicitly on Linux instead of
+   letting wgpu fall back to GL, which cannot render this app's shader.
 
 ## Building
 

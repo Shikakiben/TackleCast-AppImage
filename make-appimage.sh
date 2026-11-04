@@ -46,9 +46,11 @@ quick-sharun --make-appimage
 quick-sharun --test ./dist/*.AppImage --test-nv12 || :
 quick-sharun --test ./dist/*.AppImage --test-mjpeg || :
 
-# Assert an actual rendered frame rate. A capture-card app that cannot render
-# is useless, and the exit code would not tell us.
-APPIMAGE_EXTRACT_AND_RUN=1 timeout 50 ./dist/*.AppImage --test-nv12 \
+# Assert an actual rendered frame rate. A capture-card app that cannot render is
+# useless, and the exit code would not tell us. This needs an X server:
+# quick-sharun --test starts its own Xvfb, a bare command does not, and without
+# DISPLAY the app exits before it ever logs a summary.
+APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a timeout 60 ./dist/*.AppImage --test-nv12 \
     >/dev/null 2>&1 || :
 
 FPS_LOG=$(ls -t "${XDG_STATE_HOME:-$HOME/.local/state}"/tacklecast/logs/*.log 2>/dev/null | head -1)
